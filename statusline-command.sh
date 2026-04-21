@@ -72,14 +72,14 @@ format_rl() {
   elif [ "$pct" -ge 70 ]; then color="$YELLOW"
   else color="$GREEN"
   fi
-  reset_time=$(date -r "$reset_ts" "+%-I:%M%p" 2>/dev/null || date -d "@$reset_ts" "+%-I:%M%p" 2>/dev/null)
+  reset_time=$(date -r "$reset_ts" "+%-I:%M%p %a %b %-d" 2>/dev/null || date -d "@$reset_ts" "+%-I:%M%p %a %b %-d" 2>/dev/null)
   bar=$(make_bar "$pct")
   printf "${color}${label} ${bar} ${pct}%% resets ${reset_time}${RESET}"
 }
 
 rate_limit_str=""
 rate_limit_str="${rate_limit_str}$(format_rl "$rl_5h_pct" "$rl_5h_reset" "5h")"
-# rate_limit_str="${rate_limit_str}$(format_rl "$rl_7d_pct" "$rl_7d_reset" "7d")"
+rate_limit_str="${rate_limit_str} | $(format_rl "$rl_7d_pct" "$rl_7d_reset" "7d")"
 
 repo_root=$(cd "$current_dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null || echo "$current_dir")
 dir_display=$(basename "$repo_root")
