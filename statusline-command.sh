@@ -3,7 +3,7 @@ input=$(cat)
 
 model=$(echo "$input" | jq -r '.model.display_name // "Unknown Model"')
 used=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
-worktree=$(echo "$input" | jq -r '.worktree.name // empty')
+worktree=$(echo "$input" | jq -r '.worktree.name // .workspace.git_worktree // empty')
 total_cost=$(echo "$input" | jq -r '.cost.total_cost_usd // empty')
 current_dir=$(echo "$input" | jq -r '.worktree.original_cwd // empty')
 rl_5h_pct=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty' | awk '{printf "%.0f", $1}')
