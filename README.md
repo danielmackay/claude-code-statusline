@@ -2,32 +2,46 @@
 
 A custom statusline script for [Claude Code](https://claude.ai/claude-code) that displays real-time session information in your terminal.
 
+Based on [danielmackay/claude-code-statusline](https://github.com/danielmackay/claude-code-statusline) with the following enhancements:
+
+- **Single `jq` call** instead of 10+ — faster rendering on every API response
+- **One-line output** — compatible with Claude Code's single-line status bar
+- **POSIX `sh`** — runs on macOS, Linux, and any shell (no bash-only features)
+- **Thinking mode & effort level** indicators
+- **Context window bar** with color-coded thresholds
+- **Both rate limits** (5h + 7d) with reset timestamps
+- **Session duration** tracker
+- **Active agent** display
+- **Session name & output style** indicators
+
 ![Statusline preview](screenshot.png)
 
 ## What It Shows
 
 ```
-🤖 Claude Sonnet 4.6 | 🧠 12% | 💰 $0.04 | ⏱️ 5h ████░░░░░░ 42% resets 2:00PM
-📁 my-project | 🌳 my-feature | 🌿 main +42 -7
+🤖 Opus 4.6 T | 🧠 ██████░░ 75% | 💰 $0.42 | ⏱️ 5h ████░░░░ 45% ↻2:30PM | 📁 my-project | 🌿 develop +3 ~5 | 🕐 01:23:45
 ```
 
-| Field | Description |
+| Segment | Description |
 |---|---|
-| 🤖 Model | Active Claude model name |
-| 🧠 Context | Context window usage percentage |
+| 🤖 Model | Active model + thinking mode (`T`) + effort level |
+| 🧠 Context | Context window remaining with color bar (green >50%, yellow 20-50%, red <20%) |
 | 💰 Cost | Cumulative session cost in USD |
-| ⏱️ Rate Limit | 5-hour rate limit usage bar, percentage, and reset time |
-| 📁 Folder | Current working directory name |
-| 🌳 Worktree | Active git worktree name |
-| 🌿 Branch | Current git branch with lines added/removed |
+| ⏱️ Rate Limit | 5h/7d usage bars with percentage and reset time |
+| 📁 Folder | Git repo root name (or current directory) |
+| 🌿 Branch | Current branch + staged (`+N` green) and modified (`~N` yellow) file counts |
+| 🌳 Worktree | Active git worktree name (if any) |
+| 🕐 Duration | Session elapsed time (HH:MM:SS) |
+| ⚡ Agent | Active subagent name (if running) |
+| `[name]` | Session name (if set) |
+
+Segments only appear when they have data — no empty placeholders.
 
 ## Prerequisites
 
 - [Claude Code](https://claude.ai/claude-code) CLI installed
-- [`jq`](https://jqlang.github.io/jq/) — for parsing the JSON input from Claude Code
-- `git` — for branch and diff stats
-
-Install `jq` if needed:
+- [`jq`](https://jqlang.github.io/jq/) for JSON parsing
+- `git` for branch and diff stats
 
 ```sh
 # macOS
@@ -39,51 +53,64 @@ apt-get install jq
 
 ## Setup
 
-**1. Copy the script somewhere accessible:**
+**1. Copy the script:**
 
 ```sh
 cp statusline-command.sh ~/.claude/statusline-command.sh
 chmod +x ~/.claude/statusline-command.sh
 ```
 
-**2. Add the statusline configuration to `.claude/settings.json`:**
-
-For a **global** setup (applies to all projects), edit `~/.claude/settings.json`:
+**2. Add to `~/.claude/settings.json`** (global) or `.claude/settings.json` (per-project):
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "sh ~/.claude/statusline-command.sh",
-    "padding": 0
+    "command": "sh ~/.claude/statusline-command.sh"
   }
 }
 ```
 
-For a **project-level** setup, add the same block to `.claude/settings.json` in your project root.
-
-**3. Start Claude Code** — the statusline will appear automatically.
+**3. Start Claude Code** — the statusline appears automatically.
 
 ## Customization
 
-The script reads a JSON object from stdin with the following fields:
+### Color Thresholds
+
+Context window and rate limits use the same color scheme:
+
+| Color | Condition |
+|---|---|
+| 🟢 Green | < 70% used |
+| 🟡 Yellow | 70–89% used |
+| 🔴 Red | ≥ 90% used |
+
+### Available JSON Fields
+
+The script receives a JSON object on stdin from Claude Code:
 
 | Field | Description |
 |---|---|
-| `model.display_name` | Name of the active model |
-| `context_window.used_percentage` | Context usage as a float |
-| `worktree.name` | Active worktree name |
+| `model.display_name` | Active model name |
+| `context_window.used_percentage` | Context usage (float) |
+| `context_window.remaining_percentage` | Context remaining (float) |
 | `cost.total_cost_usd` | Session cost |
-| `cost.total_lines_added` | Lines added this session |
-| `cost.total_lines_removed` | Lines removed this session |
 | `workspace.current_dir` | Current working directory |
-| `rate_limits.five_hour.used_percentage` | 5-hour rate limit usage percentage |
-| `rate_limits.five_hour.resets_at` | Unix timestamp when 5-hour limit resets |
-| `rate_limits.seven_day.used_percentage` | 7-day rate limit usage percentage (available for optional display) |
-| `rate_limits.seven_day.resets_at` | Unix timestamp when 7-day limit resets (available for optional display) |
+| `worktree.name` | Active worktree name |
+| `session_id` | Unique session identifier |
+| `session_name` | User-set session name |
+| `agent.name` | Active subagent name |
+| `effort_level` | Current effort setting |
+| `output_style.name` | Current output style |
+| `rate_limits.five_hour.used_percentage` | 5h rate limit usage |
+| `rate_limits.five_hour.resets_at` | 5h reset Unix timestamp |
+| `rate_limits.seven_day.used_percentage` | 7d rate limit usage |
+| `rate_limits.seven_day.resets_at` | 7d reset Unix timestamp |
 
-The rate-limit bar uses color thresholds: green (<70%), yellow (70-89%), red (>=90%).
+### Performance
 
-By default, the script shows the 5-hour limit and keeps 7-day output commented out. You can enable 7-day display by uncommenting the `rate_limit_str` line near the bottom of `statusline-command.sh`.
+The script uses a single `jq` invocation with `eval` to parse all fields at once, avoiding the overhead of spawning multiple subprocesses per render cycle.
 
-Edit `statusline-command.sh` to change the format, add new fields, or adjust colors.
+## Credits
+
+Original script by [@danielmackay](https://github.com/danielmackay). Enhanced with single-parse optimization, one-line layout, thinking/effort/agent indicators, session tracking, and context bar visualization.
