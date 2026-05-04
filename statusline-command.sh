@@ -45,7 +45,7 @@ fi
 
 
 if [ -n "$total_cost" ]; then
-  cost_display=$(awk "BEGIN { printf \"%.2f\", $total_cost }")
+  cost_display=$(printf "%s" "$total_cost" | awk '{printf "%.2f", $1}')
   block_str="\$${cost_display}"
 else
   block_str="\$0.00"
