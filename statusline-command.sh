@@ -2,6 +2,7 @@
 input=$(cat)
 
 model=$(echo "$input" | jq -r '.model.display_name // "Unknown Model"')
+effort=$(echo "$input" | jq -r '.effort.level // empty')
 used=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 worktree=$(echo "$input" | jq -r '.worktree.name // empty')
 total_cost=$(echo "$input" | jq -r '.cost.total_cost_usd // empty')
@@ -83,4 +84,9 @@ rate_limit_str="${rate_limit_str}$(format_rl "$rl_5h_pct" "$rl_5h_reset" "5h")"
 
 repo_root=$(cd "$current_dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null || echo "$current_dir")
 dir_display=$(basename "$repo_root")
-printf "🤖 %s | 🧠 %s | 💰 %s | ⏱️ %s\n📁 %s | 🌳 %s | 🌿 %s" "$model" "$usage_str" "$block_str" "$rate_limit_str" "$dir_display" "$worktree_str" "$git_str"
+
+if [ -n "$effort" ]; then
+  printf "🤖 %s | 💪 %s | 🧠 %s | 💰 %s | ⏱️ %s\n📁 %s | 🌳 %s | 🌿 %s" "$model" "$effort" "$usage_str" "$block_str" "$rate_limit_str" "$dir_display" "$worktree_str" "$git_str"
+else
+  printf "🤖 %s | 🧠 %s | 💰 %s | ⏱️ %s\n📁 %s | 🌳 %s | 🌿 %s" "$model" "$usage_str" "$block_str" "$rate_limit_str" "$dir_display" "$worktree_str" "$git_str"
+fi
