@@ -52,15 +52,46 @@ else
   block_str="\$0.00"
 fi
 
+MARKER='\033[1;97m'
+
+# Percent of the window that has elapsed, i.e. where usage would sit if spread
+# evenly across it. Prints nothing when the reset time is missing or outside the
+# window, so the bar falls back to having no pace marker.
+window_elapsed_pct() {
+  reset_ts="$1"
+  window_secs="$2"
+  case "$reset_ts" in ''|*[!0-9]*) return ;; esac
+  now=$(date +%s)
+  remaining=$(( reset_ts - now ))
+  [ "$remaining" -lt 0 ] && return
+  [ "$remaining" -gt "$window_secs" ] && return
+  printf "%s" $(( (window_secs - remaining) * 100 / window_secs ))
+}
+
+# Draws the usage bar. When a pace percent is given, the cell where even usage
+# would be right now becomes a bright ┃: fill past it means burning faster than
+# the window allows, fill short of it means there is headroom.
 make_bar() {
   pct="$1"
+  pace="$2"
+  color="$3"
   width=10
   filled=$(( pct * width / 100 ))
-  empty=$(( width - filled ))
+  [ "$filled" -gt "$width" ] && filled=$width
+  marker_at=-1
+  if [ -n "$pace" ]; then
+    marker_at=$(( pace * width / 100 ))
+    [ "$marker_at" -ge "$width" ] && marker_at=$(( width - 1 ))
+  fi
   bar=""
   i=0
-  while [ $i -lt $filled ]; do bar="${bar}█"; i=$(( i + 1 )); done
-  while [ $i -lt $width ];  do bar="${bar}░"; i=$(( i + 1 )); done
+  while [ $i -lt $width ]; do
+    if [ $i -eq $marker_at ]; then bar="${bar}${MARKER}┃${RESET}${color}"
+    elif [ $i -lt $filled ]; then bar="${bar}█"
+    else bar="${bar}░"
+    fi
+    i=$(( i + 1 ))
+  done
   printf "%s" "$bar"
 }
 
@@ -68,19 +99,26 @@ format_rl() {
   pct="$1"
   reset_ts="$2"
   label="$3"
+  window_secs="$4"
   [ -z "$pct" ] && return
-  if [ "$pct" -ge 90 ]; then color="$RED"
-  elif [ "$pct" -ge 70 ]; then color="$YELLOW"
-  else color="$GREEN"
-  fi
   reset_time=$(date -r "$reset_ts" "+%-I:%M%p" 2>/dev/null || date -d "@$reset_ts" "+%-I:%M%p" 2>/dev/null)
-  bar=$(make_bar "$pct")
+  pace=$(window_elapsed_pct "$reset_ts" "$window_secs")
+  # Colour by burn rate against even usage. Up to 10 points over pace is yellow
+  # so a small burst early in the window doesn't flash red. Without a pace
+  # there is nothing to compare against, so it stays green.
+  color="$GREEN"
+  if [ -n "$pace" ]; then
+    if [ "$pct" -gt $(( pace + 10 )) ]; then color="$RED"
+    elif [ "$pct" -gt "$pace" ]; then color="$YELLOW"
+    fi
+  fi
+  bar=$(make_bar "$pct" "$pace" "$color")
   printf "${color}${label} ${bar} ${pct}%% resets ${reset_time}${RESET}"
 }
 
 rate_limit_str=""
-rate_limit_str="${rate_limit_str}$(format_rl "$rl_5h_pct" "$rl_5h_reset" "5h")"
-# rate_limit_str="${rate_limit_str}$(format_rl "$rl_7d_pct" "$rl_7d_reset" "7d")"
+rate_limit_str="${rate_limit_str}$(format_rl "$rl_5h_pct" "$rl_5h_reset" "5h" 18000)"
+# rate_limit_str="${rate_limit_str}$(format_rl "$rl_7d_pct" "$rl_7d_reset" "7d" 604800)"
 
 repo_root=$(cd "$current_dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null || echo "$current_dir")
 dir_display=$(basename "$repo_root")
