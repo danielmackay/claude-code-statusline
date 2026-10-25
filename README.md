@@ -64,6 +64,30 @@ For a **project-level** setup, add the same block to `.claude/settings.json` in 
 
 **3. Start Claude Code** — the statusline will appear automatically.
 
+### Subagent rows (optional)
+
+`subagent-statusline.sh` replaces each row of the agent panel below the prompt:
+
+```
+builder · 🤖 Opus 5.5 · Capturing History lb volume screenshot                 🧠 15% · 6m 35s
+```
+
+- The row starts with the agent type (`builder`, `general-purpose`), then the model (`claude-opus-5-5` shows as `Opus 5.5`) and effort when Claude Code sends one.
+- The text is the agent's current activity (`label`), truncated to fit the row width.
+- Context % (the token count divided by the model's context window) and the elapsed time sit at the right edge. The clock shows only while the agent is running.
+- On a narrow terminal the activity shortens first, then the model drops.
+
+Add it next to `statusLine`:
+
+```json
+{
+  "subagentStatusLine": {
+    "type": "command",
+    "command": "sh ~/.claude/subagent-statusline.sh"
+  }
+}
+```
+
 ## Customization
 
 The script reads a JSON object from stdin with the following fields:
